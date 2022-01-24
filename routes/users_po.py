@@ -196,13 +196,13 @@ def show_a_user(
 
     Return a json with the basic user information:
 
-    - user_id: Str
+    - user_id: UUID
     - email: EmailStr
     - first_name: str
     - last_name: str
     - birth_date: date
     """
-    #open file user.json in read mode with utf-8 encoding
+    # Connect to database and get a user data of table users
     results = conn.execute(users.select().where(users.c.user_id == user_id)).first()
     
     # status user
@@ -250,7 +250,7 @@ def delete_a_user(
 
     Return a json with the basic user information deleted:
 
-    - user_id: Str
+    - user_id: UUID
     - email: EmailStr
     - first_name: str
     - last_name: str
@@ -260,6 +260,7 @@ def delete_a_user(
     #  1 - user exists
     #  2 - user not exits
     user_status = 1
+    # Connect to database and get a user data of table users
     user_to_delete = conn.execute(users.select().where(users.c.user_id == user_id)).first()
 
     # Validate if user exist
@@ -324,7 +325,7 @@ def update_a_user(
 
     Return a json with the basic user information updated:
 
-    - user_id: Str
+    - user_id: UUID
     - email: EmailStr
     - first_name: str
     - last_name: str
@@ -348,8 +349,3 @@ def update_a_user(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="¡This user does not exists!"
     )
-
-
-@user.get("/")
-def get_users():
-    return conn.execute(users.select()).fetchall()

@@ -7,7 +7,7 @@ import json
 from pydantic import BaseModel
 from pydantic import EmailStr, Field
 
-# Models
+# Users Models
 
 class PasswordMixin(BaseModel):
     password: str = Field(
