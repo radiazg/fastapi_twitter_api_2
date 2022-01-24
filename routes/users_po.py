@@ -20,12 +20,13 @@ from schemas.user_model import UserBase, PasswordMixin, UserLogin, User, UserReg
 # Cryptografy
 from cryptography.fernet import Fernet
 
-# Generate key for cryptography
+# Generate key for encrypting
 key = Fernet.generate_key()
-# Generate fuction fir crypto
+
+# Generate fuction for encrypting and decrypting
 crypto_fuction = Fernet(key)
 
-# APIRouter Ini
+# APIRouter Init
 user = APIRouter()
 
 # Path Operations
@@ -68,9 +69,9 @@ def signup(
     user_dict["user_id"] = str(user_dict["user_id"])
     user_dict["birth_date"] = str(user_dict["birth_date"])
     # Encrypting password
-    user_dict["password"] = crypto_fuction.encrypt(user.password.encode("utf-8"))
+    #user_dict["password"] = crypto_fuction.encrypt(user.password.encode("utf-8"))
 
-    # Inserting new user in db
+    # Inserting new user into users table in db
     results = conn.execute(users.insert().values(user_dict))
 
     return user
@@ -106,19 +107,22 @@ def login(
     - last_name: str
     - birth_date: date
     """
-    # open file user.json in read mode with utf-8 encoding
-    results = read_file(model='users')
+    # select the user data from users tables where loging_mail equal a email
+    results = conn.execute(users.select().where(users.c.email == login_email)).first()
+
     # status user
     #  1 - user and password are correct
     #  2 - User exists but password incorrect
-    #  3 - user not exits
-    user_status = 3
-    for user in results:
-        if user['email'] == login_email:
-            user_status = 2
-            if user['password'] == login_password:
-                user_status = 1
-                user_result = user
+    #  3 - user not exits    
+    user_status = 2
+
+    if results is None:
+        user_status = 3
+    else:
+        # validate the password input with password decrypting user on database
+        if results["password"] == login_password:
+            user_status = 1
+            user_result = results
 
     if user_status == 1:
         return  user_result
@@ -159,7 +163,8 @@ def show_all_users():
     - last_name: str
     - birth_date: date
     """
-    results = read_file(model='users')
+    # Connect to database and  get all data of table with fetchall property
+    results = conn.execute(users.select()).fetchall()
     return results
 
 ### Show a user
@@ -198,18 +203,18 @@ def show_a_user(
     - birth_date: date
     """
     #open file user.json in read mode with utf-8 encoding
-    results = read_file(model='users')
+    results = conn.execute(users.select().where(users.c.user_id == user_id)).first()
+    
     # status user
     #  1 - user exists
     #  2 - user not exits
-    user_status = 2
-    for user in results:
-        if user['user_id'] == user_id:
-            user_status = 1
-            user_result = user
+    user_status = 1
 
+    if results is None:
+        user_status = 2
+    
     if user_status == 1:
-        return  user_result
+        return  results
     elif user_status == 2:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -251,26 +256,21 @@ def delete_a_user(
     - last_name: str
     - birth_date: date
     """
-    #open file user.json in read/write mode with utf-8 encoding
-    with open("users.json", "r+", encoding="utf-8") as f:
-        # read file and take the string and transform as json and loda in result
-        results = json.loads(f.read())
-        # status user
-        #  1 - user exists
-        #  2 - user not exits
-        user_status = 2
-        for user in results:
-            if user['user_id'] == user_id:
-                user_status = 1
-                results.remove(user)
-        # move the firts line in file
-        f.truncate(0)
-        f.seek(0)
-        # write in the file and transform a list of dict -results- an a json
-        f.write(json.dumps(results))
+    # status user
+    #  1 - user exists
+    #  2 - user not exits
+    user_status = 1
+    user_to_delete = conn.execute(users.select().where(users.c.user_id == user_id)).first()
 
+    # Validate if user exist
+    if user_to_delete is None:
+        user_status = 2
+
+    # Validate the return
     if user_status == 1:
-        return user
+        # delete the user into database and return the user deleted
+        conn.execute(users.delete().where(users.c.user_id == user_id))
+        return user_to_delete
     elif user_status == 2:
         raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -330,29 +330,19 @@ def update_a_user(
     - last_name: str
     - birth_date: date
     """
-    #open file user.json in read/write mode with utf-8 encoding
-    with open("users.json", "r+", encoding="utf-8") as f:
-        # read file and take the string and transform as json and loda in result
-        results = json.loads(f.read())
-        # status user
-        #  1 - user exists
-        #  2 - user not exits
+    # status user
+    #  1 - user exists
+    #  2 - user not exits
+    user_status = 1
+    user_to_update = conn.execute(users.select().where(users.c.user_id == user_id)).first()
+
+    # Validate if user exist
+    if user_to_update is None:
         user_status = 2
-        for user in results:
-            if user['user_id'] == user_id:
-                user_status = 1
-                user['first_name'] = first_name
-                user['last_name'] = last_name
-                user['email'] = email
-                user_result = user
-        # move the firts line in file
-        f.truncate(0)
-        f.seek(0)
-        # write in the file and transform a list of dict -results- an a json
-        f.write(json.dumps(results))
 
     if user_status == 1:
-        return user_result
+        conn.execute(users.update().values(first_name = first_name, last_name = last_name, email = email).where(users.c.user_id == user_id))
+        return conn.execute(users.select().where(users.c.user_id == user_id)).first()
     elif user_status == 2:
         raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
@@ -362,27 +352,4 @@ def update_a_user(
 
 @user.get("/")
 def get_users():
-    return conn.execute(users.select()).fetchall
-
-## Aditional functions
-
-### read a files
-def read_file(model: str):
-    """
-    ## Read File JSON
-
-    This fuction read a file .json
-
-    **Parameters**
-
-    - Name model : str
-
-    Return a json
-    """
-    #open file .json in read mode with utf-8 encoding
-    f = open(model + '.json', 'r', encoding='utf-8')
-    
-    # read file and take the string and transform as json and load in result
-    results = json.loads(f.read())
-    f.close()
-    return results
+    return conn.execute(users.select()).fetchall()

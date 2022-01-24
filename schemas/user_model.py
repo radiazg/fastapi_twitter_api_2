@@ -21,7 +21,7 @@ class UserBase(BaseModel):
     user_id: UUID = Field(...)
     email: EmailStr = Field(
         ..., 
-        example='ricardo@exmaple.com'
+        example='ricardo@example.com'
     )
 
 class UserLogin(UserBase, PasswordMixin):

@@ -16,7 +16,16 @@ from fastapi import HTTPException
 from routes.users_po import user
 
 
-app = FastAPI()
+app = FastAPI(
+    title="Twitter API Model on FastAPI",
+    description="This is second version of Twitter API, a platzi work",
+    version="0.2.0",
+    openapi_tags=[{
+        "name": "Users",
+        "description": "User Path Operations"
+    }
+    ]
+)
 
 app.include_router(user)
 
